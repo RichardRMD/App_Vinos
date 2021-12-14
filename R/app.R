@@ -15,7 +15,11 @@ library(FactoMineR)
 #Manova
 #ggpubr:: ggboxplot()
 library(ggpubr)
-#library(biotools)
+#Normalidad Multiple
+library(MVN)
+#Homogeneidad de convarianza
+library(biotools)
+library(car)
 
 #funciones----
 data_statistics <- function(vector_column) {
@@ -57,265 +61,250 @@ ui <- fluidPage(
     titlePanel("PCA_simple"),
     
     tabsetPanel(id="tabset",
-      # Panel load data ----
-      tabPanel("Load Data",
-               #widgets ----
-               
-               fileInput("file1",
-                         label = h3("File input")),
-               
-               DT::dataTableOutput('load_excel')
-               
-      ),
-      # Panel inspect data filter----
-      tabPanel("Inspect_the_Data",
-               fluidRow(
-                 column(
-                   width = 4,
-                   filter_data_ui("filtering", max_height = '700px')
-                   
-                 ),
-                 column(
-                   width = 8,
-                   progressBar(
-                     id = "pbar", value = 100,
-                     total = 100, display_pct = TRUE
-                   ),
-                   DT::dataTableOutput(outputId = "summary")
-                 )
-               ),
-               downloadButton('download_filter', 'Descargar Filtro xlsx')
-               
-      ),
-      # Panel Outliers ----
-      tabPanel("Outliers",
-               fluidRow(
-                 column(
-                   width = 6,
-                   uiOutput("choose_columns"),
-                   plotOutput("outliers"),
-                   hr(),
-                   tableOutput("statistics")
-                 ),
-                 column(
-                   width = 6,
-                   plotOutput("outliers_updated"),
-                   hr(),
-                   tableOutput("statistics_update")
-                   
-              
-                 )
-               ),
-               uiOutput("choose_filter"),
-               DT::dataTableOutput("Filter_outliers")
-                   
-                   
-                 
-               
-              
-               
-      ),
-      # Panel correlations ----
-      tabPanel("Correlation Plots",
-               uiOutput("choose_columns_biplot"),
-               hr(),
-               plotOutput("corr_plot"),
-               hr(),
-               p("Summary of correlations"),
-               tableOutput("corr_tables")
-      ),
-      # Panel Compute PCA ----
-      tabPanel("Compute PCA",
-               p("Elija las columnas de sus datos para incluir en el PCA."),
-               p("El PCA se vuelve a calcular automaticamente cada vez que cambia su selecccion"),
-               p("Las observaciones (es decir, filas se eliminan automaticamente si contienen valores faltantes."),
-               p("Las variables con variacion cero se han eliminado automaticamente porque no son utiles en un PCA."),
-               fluidRow(
-                 column(
-                   width = 6,
-                   uiOutput("choose_columns_pca")
-                 ),
-                 column(
-                   width = 6,
-                   verbatimTextOutput("pca_details")
-                 )
-               ),
-               tags$hr(),
-               p("Seleccione las opciones para el calculo de PCA (aqui estamos usando la funcion prcomp)"),
-               radioButtons(inputId = 'center',  
-                            label = 'Center',
-                            choices = c('Cambiar las variables para que esten centradas en cero'='Yes',
-                                        'No cambie las variables'='No'), 
-                            selected = 'Yes'),
-               
-               radioButtons('scale.', 'Scale',
-                            choices = c('Escalar variables para tener varianza unitaria'='Yes',
-                                        'No escale variables'='No'), 
-                            selected = 'Yes')
-               
-      ), # end  tab
-      # PC Plots----
-      tabPanel("PC Plots",
-               fluidRow(
-                 column(
-                   width = 6,
-                   h2("Scree plot"),
-                   p("El grafico de pantalla muestra las varianzas de cada PC y la varianza acumulada ssexplicada por cada PC (en%)"),
-                   plotOutput("plot2", height = "300px")
-                 ),
-                 column(
-                   width = 6,
-                   h2("Grafico de ejes"),
-                   plotOutput("plot_pca_output")
-                 )
-               ),
-
-               tags$hr(),
-               #h2("Grafico de PC: zoom y seleccion de puntos"),
-               p("Seleccione la variable de agrupacion"),
-               uiOutput("the_grouping_variable"),
-               tags$hr(),
-               p("Seleccione las PC para trazar"),
-               uiOutput("the_pcs_to_plot_x"),
-               uiOutput("the_pcs_to_plot_y"),
-               tags$hr(),
-               
-               fluidRow(
-                 column(
-                   width = 8,
-                   #p("Haga clic y arrastre en el primer grafico a continuacion para hacer zoom en una region del grafico O puede ir directamente al segundo grafico a continuacion para seleccionar puntos y obtener mas informacion sobre ellos."),
-                   #p("Luego, seleccione puntos en el grafico ampliado a continuacion para obtener mas informacion sobre los puntos."),
-                   #p("Puede hacer clic en la pestana 'Calcular PCA' en cualquier momento para cambiar las variables incluidas en el PCA, y luego volver a esta pestana y los graficos se actualizaran automaticamente"),
-                   plotOutput ("z_plot1", height = 400,
-                               brush = brushOpts(
-                                 id = "z_plot1Brush",
-                                 resetOnNew = TRUE))
-                   
-                 ),
-                 column(
-                   width = 4,
-                   uiOutput("view_graph")
-                 )
-               ),
-               
-               p("Haga clic y arrastre en el grafico de abajo para seleccionar puntos e inspeccione la tabla de puntos seleccionados a continuacion"),
-               
-               plotOutput("z_plot2", height = 400,
-                          brush = brushOpts(
-                            id = "plot_brush_after_zoom",
-                            resetOnNew = TRUE)),
-               tags$hr(),
-               #p("Detalles de los puntos cepillados"),
-               #tableOutput("brush_info_after_zoom")
-      ),# end  tab 
-      
-      # Panel Dendrograma ----
-      tabPanel("Dendrograma",
-               h2("Datos Pcs"),
-               fluidRow(
-                 column(
-                   width = 6,
-                   br(),br(),
-                   plotOutput("clast_opt_cent"),
-                   
-                 ),
-                 column(
-                   width = 6,
-                   uiOutput("num_clast_cent"),
-                   plotOutput("dend_cent")
-                 )
-               ),
-               fluidRow(
-                 column(
-                   width = 9,
-                   uiOutput("num_clast_pca"),
-                   plotOutput("dend_by_PCs")
-                 ),
-  
-                 column(
-                   width = 3,
-                   br(),br(),
-                   plotOutput("clast_opt_pca")
-                 )
-               ),
-               hr(),
-               h2("Datos Crudo"),
-               fluidRow(
-                 column(
-                   width = 9,
-                   uiOutput("num_clast"),
-                   plotOutput("dend_by_panelist")
-                 ),
-                 column(
-                   width = 3,
-                   br(),br(),
-                   plotOutput("clast_opt_data")
+                # Panel load data ----
+                tabPanel("Load Data",
+                         #widgets 
+                         
+                         fileInput("file1",
+                                   label = h3("File input")),
+                         
+                         DT::dataTableOutput('load_excel')
+                         
+                ),
+                # Panel inspect data filter----
+                tabPanel("Inspect_the_Data",
+                         fluidRow(
+                           column(
+                             width = 4,
+                             filter_data_ui("filtering", max_height = '700px')
+                             
+                           ),
+                           column(
+                             width = 8,
+                             progressBar(
+                               id = "pbar", value = 100,
+                               total = 100, display_pct = TRUE
+                             ),
+                             DT::dataTableOutput(outputId = "summary")
+                           )
+                         ),
+                         downloadButton('download_filter', 'Descargar Filtro xlsx')
+                         
+                ),
+                # Panel Outliers ----
+                tabPanel("Outliers",
+                         h2("Datos con Outliers"),hr(),
+                         plotOutput("outliers"),
+                         h2("Datos sin Outliers"),hr(),
+                         plotOutput("outliers_updated"),
+                         uiOutput("choose_filter"),
+                         DT::dataTableOutput("Filter_outliers")
+         
+                ),
+                # Panel correlations ----
+                tabPanel("Correlation Plots",
+                         uiOutput("choose_columns_biplot"),
+                         hr(),
+                         plotOutput("corr_plot"),
+                         hr(),
+                         p("Summary of correlations"),
+                         tableOutput("corr_tables")
+                ),
+                # Panel Compute PCA ----
+                tabPanel("Compute PCA",
+                         p("Elija las columnas de sus datos para incluir en el PCA."),
+                         p("El PCA se vuelve a calcular automaticamente cada vez que cambia su selecccion"),
+                         p("Las observaciones (es decir, filas se eliminan automaticamente si contienen valores faltantes."),
+                         p("Las variables con variacion cero se han eliminado automaticamente porque no son utiles en un PCA."),
+                         fluidRow(
+                           column(
+                             width = 6,
+                             uiOutput("choose_columns_pca")
+                           ),
+                           column(
+                             width = 6,
+                             verbatimTextOutput("pca_details")
+                           )
+                         ),
+                         tags$hr(),
+                         p("Seleccione las opciones para el calculo de PCA (aqui estamos usando la funcion prcomp)"),
+                         radioButtons(inputId = 'center',  
+                                      label = 'Center',
+                                      choices = c('Cambiar las variables para que esten centradas en cero'='Yes',
+                                                  'No cambie las variables'='No'), 
+                                      selected = 'Yes'),
+                         
+                         radioButtons('scale.', 'Scale',
+                                      choices = c('Escalar variables para tener varianza unitaria'='Yes',
+                                                  'No escale variables'='No'), 
+                                      selected = 'Yes')
+                         
+                ), # end  tab
+                # PC Plots----
+                tabPanel("PC Plots",
+                         fluidRow(
+                           column(
+                             width = 6,
+                             h2("Scree plot"),
+                             p("El grafico de pantalla muestra las varianzas de cada PC y la varianza acumulada ssexplicada por cada PC (en%)"),
+                             plotOutput("plot2", height = "300px")
+                           ),
+                           column(
+                             width = 6,
+                             h2("Grafico de ejes"),
+                             plotOutput("plot_pca_output")
+                           )
+                         ),
+                         
+                         tags$hr(),
+                         #h2("Grafico de PC: zoom y seleccion de puntos"),
+                         p("Seleccione la variable de agrupacion"),
+                         uiOutput("the_grouping_variable"),
+                         tags$hr(),
+                         p("Seleccione las PC para trazar"),
+                         uiOutput("the_pcs_to_plot_x"),
+                         uiOutput("the_pcs_to_plot_y"),
+                         tags$hr(),
+                         
+                         fluidRow(
+                           column(
+                             width = 8,
+                             #p("Haga clic y arrastre en el primer grafico a continuacion para hacer zoom en una region del grafico O puede ir directamente al segundo grafico a continuacion para seleccionar puntos y obtener mas informacion sobre ellos."),
+                             #p("Luego, seleccione puntos en el grafico ampliado a continuacion para obtener mas informacion sobre los puntos."),
+                             #p("Puede hacer clic en la pestana 'Calcular PCA' en cualquier momento para cambiar las variables incluidas en el PCA, y luego volver a esta pestana y los graficos se actualizaran automaticamente"),
+                             plotOutput ("z_plot1", height = 400,
+                                         brush = brushOpts(
+                                           id = "z_plot1Brush",
+                                           resetOnNew = TRUE))
+                             
+                           ),
+                           column(
+                             width = 4,
+                             uiOutput("view_graph")
+                           )
+                         ),
+                         
+                         p("Haga clic y arrastre en el grafico de abajo para seleccionar puntos e inspeccione la tabla de puntos seleccionados a continuacion"),
+                         
+                         plotOutput("z_plot2", height = 400,
+                                    brush = brushOpts(
+                                      id = "plot_brush_after_zoom",
+                                      resetOnNew = TRUE)),
+                         tags$hr(),
+                         #p("Detalles de los puntos cepillados"),
+                         #tableOutput("brush_info_after_zoom")
+                ),# end  tab 
                 
-                 )
-               )
-              
-      ),#end panel
-      
-      # Panel Anova----
-      tabPanel("Anova",
-               uiOutput("selector_columns_anova"),
-               plotOutput("boxplot_mean"),
-               verbatimTextOutput("anova_details"),
-               hr(),
-               plotOutput("graph_diff")
-               ),# end tab
-      
-      # Panel Validation anova----
-      tabPanel("Validacion Anova",
-               p("A partir de los residuos del modelo comprobaremos si el modelo ANOVA es adecuado. Los supuestos que se deben 
+                # Panel Dendrograma ----
+                tabPanel("Dendrograma",
+                         h2("Datos Pcs"),
+                         fluidRow(
+                           column(
+                             width = 6,
+                             br(),br(),
+                             plotOutput("clast_opt_cent"),
+                             
+                           ),
+                           column(
+                             width = 6,
+                             uiOutput("num_clast_cent"),
+                             plotOutput("dend_cent")
+                           )
+                         ),
+                         fluidRow(
+                           column(
+                             width = 9,
+                             uiOutput("num_clast_pca"),
+                             plotOutput("dend_by_PCs")
+                           ),
+                           
+                           column(
+                             width = 3,
+                             br(),br(),
+                             plotOutput("clast_opt_pca")
+                           )
+                         ),
+                         hr(),
+                         h2("Datos Crudo"),
+                         fluidRow(
+                           column(
+                             width = 9,
+                             uiOutput("num_clast"),
+                             plotOutput("dend_by_panelist")
+                           ),
+                           column(
+                             width = 3,
+                             br(),br(),
+                             plotOutput("clast_opt_data")
+                             
+                           )
+                         )
+                         
+                ),#end panel
+                
+                # Panel Anova----
+                tabPanel("Anova",
+                         uiOutput("selector_columns_anova"),
+                         plotOutput("boxplot_mean"),
+                         verbatimTextOutput("anova_details"),
+                         hr(),
+                         plotOutput("graph_diff")
+                ),# end tab
+                
+                # Panel Validation anova----
+                tabPanel("Validacion Anova",
+                         p("A partir de los residuos del modelo comprobaremos si el modelo ANOVA es adecuado. Los supuestos que se deben 
                  cumplir son tres: independencia, homocedasticidad y normalidad."),
-               h2("Independencia"),
-               plotOutput("plot_ind"),hr(),
-               h2("Normalidad"),
-               fluidRow(
-                 column(
-                   width = 6,
-                   plotOutput("plot_nor")
-                 ),
-                column(
-                  width = 6,
-                  p("Valores residuales"),
-                  verbatimTextOutput("plot_nor_test"),
-                  p("	un valor p aproximado para la prueba. Royston (1995) dice que esto es adecuado para p.value < 0.1")
-                )
-               ),
-               h2("Homocedasticidad")
-               
-               ),# end tab
-      # Panel Manova----
-      tabPanel("MANOVA",
-               fluidRow(
-                 column(
-                   width = 3,
-                   uiOutput("choose_columns_manova")
-                 ),
-                 column(
-                   width = 9,
-                   plotOutput("data_visual")
-                 )
-               ),
-               hr(),
-               h2("Estadisticas MANOVA"),
-               verbatimTextOutput("stat_manova"),
-               hr(),
-               h2("Prueba de Varianza y Covarianza"),
-               verbatimTextOutput("test_manova")
-               ), #end tab----
-      tabPanel("Modelo MANOVA",
-               h1("Modelo MANOVA"),
-               verbatimTextOutput("summary_manova")
-               )
-      
+                         h2("Independencia"),
+                         plotOutput("plot_ind"),hr(),
+                         h2("Normalidad"),
+                         fluidRow(
+                           column(
+                             width = 6,
+                             plotOutput("plot_nor")
+                           ),
+                           column(
+                             width = 6,
+                             p("Valores residuales"),
+                             verbatimTextOutput("plot_nor_test"),
+                             p("	un valor p aproximado para la prueba. Royston (1995) dice que esto es adecuado para p.value < 0.1")
+                           )
+                         ),
+                         h2("Homocedasticidad")
+                         
+                ),# end tab
+                # Panel Manova----
+                tabPanel("MANOVA",
+                         fluidRow(
+                           column(
+                             width = 3,
+                             uiOutput("choose_columns_manova")
+                           ),
+                           column(
+                             width = 9,
+                             plotOutput("data_visual")
+                           )
+                         ),
+                         hr(),
+                         h2("Normalidad Multiple"),
+                         verbatimTextOutput("stat_manova"),
+                         hr(),
+                         h2("Estadisticas MANOVA"),
+                         verbatimTextOutput("mult_norm"),
+                         hr(),
+                         h2("Homogeneidad en las matrices de covarianza"),
+                         p("Prueba M"),
+                         verbatimTextOutput("homog_ofcov"),
+                         hr(),
+                         h2("Modelo MANOVA"),
+                         verbatimTextOutput("summary_manova")
+                ) #end tab----
+                
     )
   )
 )
 
-  
+
 
 # Server logic ----
 server <- function(input, output, session) {
@@ -330,7 +319,7 @@ server <- function(input, output, session) {
   data <- reactive({
     the_data <- the_data_fn()
     if (is.null(the_data)) return(NULL)
-    the_data <- select(the_data, -c(feature_id, panelist_id, product_id))
+    the_data <- dplyr::select(the_data, -c(feature_id, panelist_id, product_id))
     wide <- the_data %>%
       pivot_wider(names_from = feature_name, 
                   values_from = score)
@@ -345,7 +334,7 @@ server <- function(input, output, session) {
     return(the_data)
     
   })
-    
+  
   # Tab Filter and load----
   res_filter <- filter_data_server(
     
@@ -417,18 +406,6 @@ server <- function(input, output, session) {
     
   })
   
-  # Select column feature_name
-  output$choose_columns <- renderUI({
-    
-    the_data <- data_filter()
-    the_data_num <- the_data[,sapply(the_data,is.numeric)]
-    colnames <- names(the_data_num)
-    
-    selectInput("select_feature", label = h3("Seleccione feature_name"), 
-                choices = colnames, 
-                selected = colnames[1])
-  })
-  
   # chart Outliers
   output$outliers <- renderPlot({
     if (is.null(input$select_feature)) {
@@ -436,11 +413,11 @@ server <- function(input, output, session) {
     }
     else {
       the_data <- res_filter$filtered()
-      column_select <- input$select_feature
-      boxplot(the_data[, column_select],
-          horizontal = FALSE)
+      ggboxplot(the_data,
+                merge=T,
+                palette = "jco",)
     }
-
+    
   })
   
   # update Outliers chart
@@ -450,8 +427,7 @@ server <- function(input, output, session) {
       return()
     }
     else {
-      column_select <- input$select_feature
-      boxplot(the_data[[column_select]])
+      boxplot(the_data)
     }
     
   })
@@ -543,7 +519,7 @@ server <- function(input, output, session) {
   })
   # corr plot
   output$corr_plot <- renderPlot({
-
+    
     select_filter <- input$select_filter
     if (is.null(select_filter)) {
       the_data <- res_filter$filtered()
@@ -639,11 +615,11 @@ server <- function(input, output, session) {
     if(is.null(columns)){return()}
     else{
       #split(the_data, product_name)
-    
-      the_data_subset <- na.omit(the_data[, columns, drop = FALSE])
-
       
-
+      the_data_subset <- na.omit(the_data[, columns, drop = FALSE])
+      
+      
+      
       # from http://rpubs.com/sinhrks/plot_pca
       pca_output <- prcomp(na.omit(the_data_subset), 
                            center = (input$center == 'Yes'), 
@@ -823,8 +799,8 @@ server <- function(input, output, session) {
     }
     
     
-
- 
+    
+    
     
     
   })
@@ -875,13 +851,13 @@ server <- function(input, output, session) {
     
     
   })
-
+  
   "output$brush_info_after_zoom <- renderTable({
     # the brushing function
     brushedPoints(pca_objects()$pcs_df, input$plot_brush_after_zoom)
   })"
   
-
+  
   
   # Tab Dendrograma----
   
@@ -933,8 +909,8 @@ server <- function(input, output, session) {
                                      k.max = kmax,
                                      verbose = FALSE)+
         labs(title= "Clastering optimo PCA centroide")
-                         
-        
+      
+      
       cluster.optimo
     }
     
@@ -970,10 +946,10 @@ server <- function(input, output, session) {
     else {
       the_data <- without_outliers_fn()
     }
-
+    
     the_data_num <- the_data[,sapply(the_data,is.numeric)]
     Zdata <- scale(the_data_num)
-
+    
     cluster.optimo <- fviz_nbclust(the_data_num,
                                    hcut,
                                    method = "gap_stat",
@@ -985,14 +961,14 @@ server <- function(input, output, session) {
   })
   
   output$dend_cent<- renderPlot({
-
+    
     centroids <- get_cent()
     if (is.null(centroids) || is.null(input$num_k_for_cent)) {return()}
     else {
       e_centroids <- data.frame(centroids, 
                                 row.names = centroids$grouping2)
       e_centroids <- select(e_centroids, -c(grouping2))
-    
+      
       k <- as.numeric(input$num_k_for_cent)
       
       res.hc <- eclust(e_centroids, "hclust", graph = TRUE, k = k)
@@ -1029,9 +1005,9 @@ server <- function(input, output, session) {
                      k=k)
     fviz_dend(res.hc, rect = TRUE, show_labels = TRUE)+
       labs(title= "Dendrograma datos PCA")
-  
     
-
+    
+    
   })
   
   output$dend_by_PCs <- renderPlot({
@@ -1126,10 +1102,10 @@ server <- function(input, output, session) {
       fm = aov( lm(var ~ the_data$product_name))
       intervals = TukeyHSD(fm, conf.level = 0.95 )
       plot(intervals)
-        
+      
       
     }
-
+    
     
     
     
@@ -1223,7 +1199,7 @@ server <- function(input, output, session) {
       }
       
       if(length(input$columns_manova) > 10) {
-        stop("Permito graficar un maximo de 10 variable (Limite de colores)")
+        stop("Permite graficar un maximo de 10 variable (Limite de colores)")
       }
       else{
         ggboxplot(the_data,
@@ -1257,7 +1233,23 @@ server <- function(input, output, session) {
     
   })
   
-  output$test_manova <- renderPrint({
+  output$mult_norm <- renderPrint({
+    filter_select <- input$select_filter
+    if(is.null(filter_select) || filter_select==1 ) {
+      the_data <- res_filter$filtered()
+    }
+    else {
+      the_data <- without_outliers_fn()
+    }
+    columns_manova <- input$columns_manova
+    if(is.null(columns_manova)){return()}
+    else{
+      mvn(the_data[,columns_manova],mvnTest = "hz")
+    }
+    
+  })
+  
+  output$homog_ofcov <- renderPrint({
     
     filter_select <- input$select_filter
     if(is.null(filter_select) || filter_select==1 ) {
@@ -1267,12 +1259,11 @@ server <- function(input, output, session) {
       the_data <- without_outliers_fn()
     }
     
-    #test_cov <- boxM(the_data[,input$columns_manova],grouping = the_data$product_name)
-    #print(test_cov)
+    cov_matriz <- boxM(the_data[,input$columns_manova],grouping = the_data$product_name)
+    print(cov_matriz)
     
   })
-
-  # Tab Model manova----
+  
   output$summary_manova <- renderPrint({
     filter_select <- input$select_filter
     if(is.null(filter_select) || filter_select==1 ) {
@@ -1281,13 +1272,14 @@ server <- function(input, output, session) {
     else {
       the_data <- without_outliers_fn()
     }
-    if(is.null(input$columns_manova)){return()}
+    columns_manova <- input$columns_manova
+    if(is.null(columns_manova)){return()}
     else{
-      str(input$columns_manova)
-      mod<-manova(c(the_data$Intensidad)~the_data$product_name,data=the_data)
-      summary(mod)
+      #mod1<-manova(cbind(y1,y2,y3)~sex+temp,data=ratas)
+      #summary(mod)
     }
   })
+  
   
 }
 
